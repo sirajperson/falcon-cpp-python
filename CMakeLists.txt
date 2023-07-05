@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.4...3.22)
 
-project(llama_cpp)
+project(falcon_cpp)
 
 option(FORCE_CMAKE "Force CMake build of Python bindings" OFF)
 
@@ -8,27 +8,27 @@ set(FORCE_CMAKE $ENV{FORCE_CMAKE})
 
 if (UNIX AND NOT FORCE_CMAKE)
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/vendor/llama.cpp/libllama.so
+        OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ggllm.cpp/libggllm.so
         COMMAND make libllama.so
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/vendor/llama.cpp
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ggllm.cpp
     )
     add_custom_target(
         run ALL
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vendor/llama.cpp/libllama.so
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ggllm.cpp/libggllm.so
     )
     install(
-        FILES ${CMAKE_CURRENT_SOURCE_DIR}/vendor/llama.cpp/libllama.so
+        FILES ${CMAKE_CURRENT_SOURCE_DIR}/vendor/ggllm.cpp/libggllm.so
         DESTINATION llama_cpp
     )
 else()
     set(BUILD_SHARED_LIBS "On")
-    add_subdirectory(vendor/llama.cpp)
+    add_subdirectory(vendor/ggllm.cpp)
     install(
-        TARGETS llama 
-        LIBRARY DESTINATION llama_cpp
-        RUNTIME DESTINATION llama_cpp
-        ARCHIVE DESTINATION llama_cpp
-        FRAMEWORK DESTINATION llama_cpp
-        RESOURCE DESTINATION llama_cpp
+        TARGETS ggllm
+        LIBRARY DESTINATION falcon_cpp
+        RUNTIME DESTINATION falcon_cpp
+        ARCHIVE DESTINATION falcon_cpp
+        FRAMEWORK DESTINATION falcon_cpp
+        RESOURCE DESTINATION falcon_cpp
     )
 endif()

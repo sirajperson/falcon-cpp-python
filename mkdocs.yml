@@ -9,7 +9,7 @@ plugins:
   - search
 
 watch:
-  - llama_cpp
+  - falcon_cpp
 
 markdown_extensions:
   - pymdownx.highlight:
