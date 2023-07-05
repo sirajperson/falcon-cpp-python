@@ -24,7 +24,7 @@ class Settings(BaseSettings):
         default=None,
         description="The alias of the model to use for generating completions.",
     )
-    n_ctx: int = Field(default=2048, ge=1, description="The context size.")
+    n_ctx: int = Field(default=8192, ge=1, description="The context size.")
     n_gpu_layers: int = Field(
         default=0,
         ge=0,

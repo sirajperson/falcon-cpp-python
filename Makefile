@@ -34,14 +34,14 @@ deploy.gh-docs:
 	mkdocs gh-deploy
 
 clean:
-	- cd vendor/llama.cpp && make clean
-	- cd vendor/llama.cpp && rm libllama.so
+	- cd vendor/ggllm.cpp && make clean
+	- cd vendor/ggllm.cpp && rm ggllm.so
 	- rm -rf _skbuild
-	- rm llama_cpp/*.so
-	- rm llama_cpp/*.dylib
-	- rm llama_cpp/*.metal
-	- rm llama_cpp/*.dll
-	- rm llama_cpp/*.lib
+	- rm falcon_cpp/*.so
+	- rm falcon_cpp/*.dylib
+	- rm falcon_cpp/*.metal
+	- rm falcon_cpp/*.dll
+	- rm falcon_cpp/*.lib
 
 .PHONY: \
 	update \
