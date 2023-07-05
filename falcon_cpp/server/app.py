@@ -5,7 +5,7 @@ from functools import partial
 from typing import Iterator, List, Optional, Union, Dict
 from typing_extensions import TypedDict, Literal
 
-import llama_cpp
+import falcon_cpp
 
 import anyio
 from anyio.streams.memory import MemoryObjectSendStream
@@ -43,11 +43,11 @@ class Settings(BaseSettings):
     )
     f16_kv: bool = Field(default=True, description="Whether to use f16 key/value.")
     use_mlock: bool = Field(
-        default=llama_cpp.llama_mlock_supported(),
+        default=falcon_cpp.falcon_mlock_supported(),
         description="Use mlock.",
     )
     use_mmap: bool = Field(
-        default=llama_cpp.llama_mmap_supported(),
+        default=falcon_cpp.falcon_mmap_supported(),
         description="Use mmap.",
     )
     embedding: bool = Field(default=True, description="Whether to use embeddings.")
@@ -90,14 +90,14 @@ class Settings(BaseSettings):
 router = APIRouter()
 
 settings: Optional[Settings] = None
-llama: Optional[llama_cpp.Llama] = None
+falcon: Optional[falcon_cpp.falcon] = None
 
 
 def create_app(settings: Optional[Settings] = None):
     if settings is None:
         settings = Settings()
     app = FastAPI(
-        title="🦙 llama.cpp Python API",
+        title="🦙 falcon.cpp Python API",
         version="0.0.1",
     )
     app.add_middleware(
@@ -108,8 +108,8 @@ def create_app(settings: Optional[Settings] = None):
         allow_headers=["*"],
     )
     app.include_router(router)
-    global llama
-    llama = llama_cpp.Llama(
+    global falcon
+    falcon = falcon_cpp.Falcon(
         model_path=settings.model,
         n_gpu_layers=settings.n_gpu_layers,
         seed=settings.seed,
@@ -129,14 +129,14 @@ def create_app(settings: Optional[Settings] = None):
         if settings.cache_type == "disk":
             if settings.verbose:
                 print(f"Using disk cache with size {settings.cache_size}")
-            cache = llama_cpp.LlamaDiskCache(capacity_bytes=settings.cache_size)
+            cache = falcon_cpp.FalconDiskCache(capacity_bytes=settings.cache_size)
         else:
             if settings.verbose:
                 print(f"Using ram cache with size {settings.cache_size}")
-            cache = llama_cpp.LlamaRAMCache(capacity_bytes=settings.cache_size)
+            cache = falcon_cpp.FalconRAMCache(capacity_bytes=settings.cache_size)
 
-        cache = llama_cpp.LlamaCache(capacity_bytes=settings.cache_size)
-        llama.set_cache(cache)
+        cache = falcon_cpp.FalconCache(capacity_bytes=settings.cache_size)
+        falcon.set_cache(cache)
 
     def set_settings(_settings: Settings):
         global settings
@@ -146,12 +146,12 @@ def create_app(settings: Optional[Settings] = None):
     return app
 
 
-llama_lock = Lock()
+falcon_lock = Lock()
 
 
-def get_llama():
-    with llama_lock:
-        yield llama
+def get_falcon():
+    with falcon_lock:
+        yield falcon
 
 
 def get_settings():
@@ -276,7 +276,7 @@ class CreateCompletionRequest(BaseModel):
     best_of: Optional[int] = 1
     user: Optional[str] = Field(None)
 
-    # llama.cpp specific parameters
+    # falcon.cpp specific parameters
     top_k: int = top_k_field
     repeat_penalty: float = repeat_penalty_field
     logit_bias_type: Optional[Literal["input_ids", "tokens"]] = Field(None)
@@ -290,11 +290,11 @@ class CreateCompletionRequest(BaseModel):
         }
 
 
-CreateCompletionResponse = create_model_from_typeddict(llama_cpp.Completion)
+CreateCompletionResponse = create_model_from_typeddict(falcon_cpp.Completion)
 
 
 def make_logit_bias_processor(
-    llama: llama_cpp.Llama,
+    falcon: falcon_cpp.Falcon,
     logit_bias: Dict[str, float],
     logit_bias_type: Optional[Literal["input_ids", "tokens"]],
 ):
@@ -310,7 +310,7 @@ def make_logit_bias_processor(
     elif logit_bias_type == "tokens":
         for token, score in logit_bias.items():
             token = token.encode('utf-8')
-            for input_id in llama.tokenize(token, add_bos=False):
+            for input_id in falcon.tokenize(token, add_bos=False):
                 to_bias[input_id] = score
 
     def logit_bias_processor(
@@ -333,7 +333,7 @@ def make_logit_bias_processor(
 async def create_completion(
     request: Request,
     body: CreateCompletionRequest,
-    llama: llama_cpp.Llama = Depends(get_llama),
+    falcon: falcon_cpp.Falcon = Depends(get_falcon),
 ):
     if isinstance(body.prompt, list):
         assert len(body.prompt) <= 1
@@ -349,8 +349,8 @@ async def create_completion(
     kwargs = body.dict(exclude=exclude)
 
     if body.logit_bias is not None:
-        kwargs['logits_processor'] = llama_cpp.LogitsProcessorList([
-            make_logit_bias_processor(llama, body.logit_bias, body.logit_bias_type),
+        kwargs['logits_processor'] = falcon_cpp.LogitsProcessorList([
+            make_logit_bias_processor(falcon, body.logit_bias, body.logit_bias_type),
         ])
 
     if body.stream:
@@ -359,7 +359,7 @@ async def create_completion(
         async def event_publisher(inner_send_chan: MemoryObjectSendStream):
             async with inner_send_chan:
                 try:
-                    iterator: Iterator[llama_cpp.CompletionChunk] = await run_in_threadpool(llama, **kwargs)  # type: ignore
+                    iterator: Iterator[falcon_cpp.CompletionChunk] = await run_in_threadpool(falcon, **kwargs)  # type: ignore
                     async for chunk in iterate_in_threadpool(iterator):
                         await inner_send_chan.send(dict(data=json.dumps(chunk)))
                         if await request.is_disconnected():
@@ -378,7 +378,7 @@ async def create_completion(
             recv_chan, data_sender_callable=partial(event_publisher, send_chan)
         )
     else:
-        completion: llama_cpp.Completion = await run_in_threadpool(llama, **kwargs)  # type: ignore
+        completion: falcon_cpp.Completion = await run_in_threadpool(falcon, **kwargs)  # type: ignore
         return completion
 
 
@@ -395,7 +395,7 @@ class CreateEmbeddingRequest(BaseModel):
         }
 
 
-CreateEmbeddingResponse = create_model_from_typeddict(llama_cpp.Embedding)
+CreateEmbeddingResponse = create_model_from_typeddict(falcon_cpp.Embedding)
 
 
 @router.post(
@@ -403,10 +403,10 @@ CreateEmbeddingResponse = create_model_from_typeddict(llama_cpp.Embedding)
     response_model=CreateEmbeddingResponse,
 )
 async def create_embedding(
-    request: CreateEmbeddingRequest, llama: llama_cpp.Llama = Depends(get_llama)
+    request: CreateEmbeddingRequest, falcon: falcon_cpp.Falcon = Depends(get_falcon)
 ):
     return await run_in_threadpool(
-        llama.create_embedding, **request.dict(exclude={"user"})
+        falcon.create_embedding, **request.dict(exclude={"user"})
     )
 
 
@@ -438,7 +438,7 @@ class CreateChatCompletionRequest(BaseModel):
     n: Optional[int] = 1
     user: Optional[str] = Field(None)
 
-    # llama.cpp specific parameters
+    # falcon.cpp specific parameters
     top_k: int = top_k_field
     repeat_penalty: float = repeat_penalty_field
     logit_bias_type: Optional[Literal["input_ids", "tokens"]] = Field(None)
@@ -458,7 +458,7 @@ class CreateChatCompletionRequest(BaseModel):
         }
 
 
-CreateChatCompletionResponse = create_model_from_typeddict(llama_cpp.ChatCompletion)
+CreateChatCompletionResponse = create_model_from_typeddict(falcon_cpp.ChatCompletion)
 
 
 @router.post(
@@ -468,8 +468,8 @@ CreateChatCompletionResponse = create_model_from_typeddict(llama_cpp.ChatComplet
 async def create_chat_completion(
     request: Request,
     body: CreateChatCompletionRequest,
-    llama: llama_cpp.Llama = Depends(get_llama),
-) -> Union[llama_cpp.ChatCompletion, EventSourceResponse]:
+    falcon: falcon_cpp.Falcon = Depends(get_falcon),
+) -> Union[falcon_cpp.ChatCompletion, EventSourceResponse]:
     exclude = {
         "n",
         "logit_bias",
@@ -479,8 +479,8 @@ async def create_chat_completion(
     kwargs = body.dict(exclude=exclude)
 
     if body.logit_bias is not None:
-        kwargs['logits_processor'] = llama_cpp.LogitsProcessorList([
-            make_logit_bias_processor(llama, body.logit_bias, body.logit_bias_type),
+        kwargs['logits_processor'] = falcon_cpp.LogitsProcessorList([
+            make_logit_bias_processor(falcon, body.logit_bias, body.logit_bias_type),
         ])
 
     if body.stream:
@@ -489,7 +489,7 @@ async def create_chat_completion(
         async def event_publisher(inner_send_chan: MemoryObjectSendStream):
             async with inner_send_chan:
                 try:
-                    iterator: Iterator[llama_cpp.ChatCompletionChunk] = await run_in_threadpool(llama.create_chat_completion, **kwargs)  # type: ignore
+                    iterator: Iterator[falcon_cpp.ChatCompletionChunk] = await run_in_threadpool(falcon.create_chat_completion, **kwargs)  # type: ignore
                     async for chat_chunk in iterate_in_threadpool(iterator):
                         await inner_send_chan.send(dict(data=json.dumps(chat_chunk)))
                         if await request.is_disconnected():
@@ -509,8 +509,8 @@ async def create_chat_completion(
             data_sender_callable=partial(event_publisher, send_chan),
         )
     else:
-        completion: llama_cpp.ChatCompletion = await run_in_threadpool(
-            llama.create_chat_completion, **kwargs  # type: ignore
+        completion: falcon_cpp.ChatCompletion = await run_in_threadpool(
+            falcon.create_chat_completion, **kwargs  # type: ignore
         )
         return completion
 
@@ -533,7 +533,7 @@ GetModelResponse = create_model_from_typeddict(ModelList)
 @router.get("/v1/models", response_model=GetModelResponse)
 async def get_models(
     settings: Settings = Depends(get_settings),
-    llama: llama_cpp.Llama = Depends(get_llama),
+    falcon: falcon_cpp.Falcon = Depends(get_falcon),
 ) -> ModelList:
     return {
         "object": "list",
@@ -541,7 +541,7 @@ async def get_models(
             {
                 "id": settings.model_alias
                 if settings.model_alias is not None
-                else llama.model_path,
+                else falcon.model_path,
                 "object": "model",
                 "owned_by": "me",
                 "permissions": [],

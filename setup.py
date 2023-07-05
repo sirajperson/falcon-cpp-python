@@ -6,16 +6,16 @@ this_directory = Path(__file__).parent
 long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
-    name="llama_cpp_python",
-    description="A Python wrapper for llama.cpp",
+    name="falcon_cpp_python",
+    description="A Python wrapper for ggllm.cpp to run Falcon models",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    version="0.1.67",
-    author="Andrei Betlen",
-    author_email="abetlen@gmail.com",
+    version="0.0.1",
+    author="Siraj Florida",
+    author_email="sirajperson@gmail.com",
     license="MIT",
-    package_dir={"llama_cpp": "llama_cpp", "llama_cpp.server": "llama_cpp/server"},
-    packages=["llama_cpp", "llama_cpp.server"],
+    package_dir={"falcon_cpp": "falcon_cpp", "falcon_cpp.server": "falcon_cpp/server"},
+    packages=["falcon_cpp", "falcon_cpp.server"],
     install_requires=["typing-extensions>=4.5.0", "numpy>=1.20.0", "diskcache>=5.6.1"],
     extras_require={
         "server": ["uvicorn>=0.21.1", "fastapi>=0.95.0", "sse-starlette>=1.3.3"],

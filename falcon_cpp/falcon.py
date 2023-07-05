@@ -20,15 +20,15 @@ from collections import deque, OrderedDict
 
 import diskcache
 
-from . import llama_cpp
-from .llama_types import *
+from . import falcon_cpp
+from .falcon_types import *
 
 import numpy as np
 import numpy.typing as npt
 
 
-class BaseLlamaCache(ABC):
-    """Base cache class for a llama.cpp model."""
+class BaseFalconCache(ABC):
+    """Base cache class for a falcon.cpp model."""
 
     def __init__(self, capacity_bytes: int = (2 << 30)):
         self.capacity_bytes = capacity_bytes
@@ -45,7 +45,7 @@ class BaseLlamaCache(ABC):
         pass
 
     @abstractmethod
-    def __getitem__(self, key: Sequence[int]) -> "LlamaState":
+    def __getitem__(self, key: Sequence[int]) -> "FalconState":
         raise NotImplementedError
 
     @abstractmethod
@@ -53,21 +53,21 @@ class BaseLlamaCache(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def __setitem__(self, key: Sequence[int], value: "LlamaState") -> None:
+    def __setitem__(self, key: Sequence[int], value: "FalconState") -> None:
         raise NotImplementedError
 
 
-class LlamaRAMCache(BaseLlamaCache):
-    """Cache for a llama.cpp model using RAM."""
+class FalconRAMCache(BaseFalconCache):
+    """Cache for a falcon.cpp model using RAM."""
 
     def __init__(self, capacity_bytes: int = (2 << 30)):
         super().__init__(capacity_bytes)
         self.capacity_bytes = capacity_bytes
-        self.cache_state: OrderedDict[Tuple[int, ...], "LlamaState"] = OrderedDict()
+        self.cache_state: OrderedDict[Tuple[int, ...], "FalconState"] = OrderedDict()
 
     @property
     def cache_size(self):
-        return sum([state.llama_state_size for state in self.cache_state.values()])
+        return sum([state.falcon_state_size for state in self.cache_state.values()])
 
     def _find_longest_prefix_key(
         self,
@@ -76,7 +76,7 @@ class LlamaRAMCache(BaseLlamaCache):
         min_len = 0
         min_key = None
         keys = (
-            (k, Llama.longest_token_prefix(k, key)) for k in self.cache_state.keys()
+            (k, Falcon.longest_token_prefix(k, key)) for k in self.cache_state.keys()
         )
         for k, prefix_len in keys:
             if prefix_len > min_len:
@@ -84,7 +84,7 @@ class LlamaRAMCache(BaseLlamaCache):
                 min_key = k
         return min_key
 
-    def __getitem__(self, key: Sequence[int]) -> "LlamaState":
+    def __getitem__(self, key: Sequence[int]) -> "FalconState":
         key = tuple(key)
         _key = self._find_longest_prefix_key(key)
         if _key is None:
@@ -96,7 +96,7 @@ class LlamaRAMCache(BaseLlamaCache):
     def __contains__(self, key: Sequence[int]) -> bool:
         return self._find_longest_prefix_key(tuple(key)) is not None
 
-    def __setitem__(self, key: Sequence[int], value: "LlamaState"):
+    def __setitem__(self, key: Sequence[int], value: "FalconState"):
         key = tuple(key)
         if key in self.cache_state:
             del self.cache_state[key]
@@ -106,14 +106,14 @@ class LlamaRAMCache(BaseLlamaCache):
 
 
 # Alias for backwards compatibility
-LlamaCache = LlamaRAMCache
+FalconCache = FalconRAMCache
 
 
-class LlamaDiskCache(BaseLlamaCache):
-    """Cache for a llama.cpp model using disk."""
+class FalconDiskCache(BaseFalconCache):
+    """Cache for a falcon.cpp model using disk."""
 
     def __init__(
-        self, cache_dir: str = ".cache/llama_cache", capacity_bytes: int = (2 << 30)
+        self, cache_dir: str = ".cache/falcon_cache", capacity_bytes: int = (2 << 30)
     ):
         super().__init__(capacity_bytes)
         self.cache = diskcache.Cache(cache_dir)
@@ -129,54 +129,54 @@ class LlamaDiskCache(BaseLlamaCache):
         min_len = 0
         min_key: Optional[Tuple[int, ...]] = None
         for k in self.cache.iterkeys():  # type: ignore
-            prefix_len = Llama.longest_token_prefix(k, key)
+            prefix_len = Falcon.longest_token_prefix(k, key)
             if prefix_len > min_len:
                 min_len = prefix_len
                 min_key = k  # type: ignore
         return min_key
 
-    def __getitem__(self, key: Sequence[int]) -> "LlamaState":
+    def __getitem__(self, key: Sequence[int]) -> "FalconState":
         key = tuple(key)
         _key = self._find_longest_prefix_key(key)
         if _key is None:
             raise KeyError("Key not found")
-        value: "LlamaState" = self.cache.pop(_key)  # type: ignore
+        value: "FalconState" = self.cache.pop(_key)  # type: ignore
         # NOTE: This puts an integer as key in cache, which breaks,
-        # Llama.longest_token_prefix(k, key) above since k is not a tuple of ints/tokens
+        # Falcon.longest_token_prefix(k, key) above since k is not a tuple of ints/tokens
         # self.cache.push(_key, side="front")  # type: ignore
         return value
 
     def __contains__(self, key: Sequence[int]) -> bool:
         return self._find_longest_prefix_key(tuple(key)) is not None
 
-    def __setitem__(self, key: Sequence[int], value: "LlamaState"):
-        print("LlamaDiskCache.__setitem__: called", file=sys.stderr)
+    def __setitem__(self, key: Sequence[int], value: "FalconState"):
+        print("FalconDiskCache.__setitem__: called", file=sys.stderr)
         key = tuple(key)
         if key in self.cache:
-            print("LlamaDiskCache.__setitem__: delete", file=sys.stderr)
+            print("FalconDiskCache.__setitem__: delete", file=sys.stderr)
             del self.cache[key]
         self.cache[key] = value
-        print("LlamaDiskCache.__setitem__: set", file=sys.stderr)
+        print("FalconDiskCache.__setitem__: set", file=sys.stderr)
         while self.cache_size > self.capacity_bytes and len(self.cache) > 0:
             key_to_remove = next(iter(self.cache))
             del self.cache[key_to_remove]
-        print("LlamaDiskCache.__setitem__: trim", file=sys.stderr)
+        print("FalconDiskCache.__setitem__: trim", file=sys.stderr)
 
 
-class LlamaState:
+class FalconState:
     def __init__(
         self,
         input_ids: npt.NDArray[np.intc],
         scores: npt.NDArray[np.single],
         n_tokens: int,
-        llama_state: bytes,
-        llama_state_size: int,
+        falcon_state: bytes,
+        falcon_state_size: int,
     ):
         self.input_ids = input_ids
         self.scores = scores
         self.n_tokens = n_tokens
-        self.llama_state = llama_state
-        self.llama_state_size = llama_state_size
+        self.falcon_state = falcon_state
+        self.falcon_state_size = falcon_state_size
 
 
 LogitsProcessor = Callable[[List[int], List[float]], List[float]]
@@ -197,8 +197,8 @@ class StoppingCriteriaList(List[StoppingCriteria]):
         return any([stopping_criteria(input_ids, logits) for stopping_criteria in self])
 
 
-class Llama:
-    """High-level Python wrapper for a llama.cpp model."""
+class Falcon:
+    """High-level Python wrapper for a falcon.cpp model."""
 
     def __init__(
         self,
@@ -221,37 +221,56 @@ class Llama:
         lora_path: Optional[str] = None,
         low_vram: bool = False,
         verbose: bool = True,
-    ):
-        """Load a llama.cpp model from `model_path`.
+        ):
 
-        Args:
-            model_path: Path to the model.
-            n_ctx: Maximum context size.
-            n_parts: Number of parts to split the model into. If -1, the number of parts is automatically determined.
-            seed: Random seed. -1 for random.
-            f16_kv: Use half-precision for key/value cache.
-            logits_all: Return logits for all tokens, not just the last token.
-            vocab_only: Only load the vocabulary no weights.
-            use_mmap: Use mmap if possible.
-            use_mlock: Force the system to keep the model in RAM.
-            embedding: Embedding mode only.
-            n_threads: Number of threads to use. If None, the number of threads is automatically determined.
-            n_batch: Maximum number of prompt tokens to batch together when calling llama_eval.
-            last_n_tokens_size: Maximum number of tokens to keep in the last_n_tokens deque.
-            lora_base: Optional path to base model, useful if using a quantized base model and you want to apply LoRA to an f16 model.
-            lora_path: Path to a LoRA file to apply to the model.
-            verbose: Print verbose output to stderr.
+        # TODO: Add the parameters for
+        '''
+            -ts SPLIT --tensor-split SPLIT
+                            how to split tensors across multiple GPUs, comma-separated list of proportions, e.g. 3,1
+            -mg i, --main-gpu i   the GPU to use for scratch and small tensors (0 = first)
+            --override-max-gpu N
+                                limits the number of GPUs visible (allows to disable multi/single GPU processing)
+            --gpu-reserve-mb-main override reserved total VRAM MB (can be negative if your driver supports swapping into RAM)
+            --mtest               compute maximum memory usage
+            --export              export the computation graph to 'falcon.ggml'
+            --verbose-prompt      print prompt before generation
+            -dt, --debug-timings  print GGML_PERF debug output (requires GGML_PERF=1 for timings)
+                                1 = print first layer, 2 = print first and last layer, 3+ = all layers
+            --lora FNAME          apply LoRA adapter (implies --no-mmap)
+            --lora-base FNAME     optional model to use as a base for the layers modified by the LoRA adapter
+            -m FNAME, --model FNAME
+        '''
 
-        Raises:
-            ValueError: If the model path does not exist.
-
-        Returns:
-            A Llama instance.
-        """
+        """Load a Falcon model from `model_path`.
+        
+                Args:
+                    model_path: Path to the model.
+                    n_ctx: Maximum context size.
+                    n_parts: Number of parts to split the model into. If -1, the number of parts is automatically determined.
+                    seed: Random seed. -1 for random.
+                    f16_kv: Use half-precision for key/value cache.
+                    logits_all: Return logits for all tokens, not just the last token.
+                    vocab_only: Only load the vocabulary no weights.
+                    use_mmap: Use mmap if possible.
+                    use_mlock: Force the system to keep the model in RAM.
+                    embedding: Embedding mode only.
+                    n_threads: Number of threads to use. If None, the number of threads is automatically determined.
+                    n_batch: Maximum number of prompt tokens to batch together when calling falcon_eval.
+                    last_n_tokens_size: Maximum number of tokens to keep in the last_n_tokens deque.
+                    lora_base: Optional path to base model, useful if using a quantized base model and you want to apply LoRA to an f16 model.
+                    lora_path: Path to a LoRA file to apply to the model.
+                    verbose: Print verbose output to stderr.
+        
+                Raises:
+                    ValueError: If the model path does not exist.
+        
+                Returns:
+                    A falcon instance.
+                """
         self.verbose = verbose
         self.model_path = model_path
 
-        self.params = llama_cpp.llama_context_default_params()
+        self.params = falcon_cpp.falcon_context_default_params()
         self.params.n_ctx = n_ctx
         self.params.n_gpu_layers = n_gpu_layers
         self.params.seed = seed
@@ -266,7 +285,7 @@ class Llama:
         self.last_n_tokens_size = last_n_tokens_size
         self.n_batch = min(n_ctx, n_batch)
 
-        self.cache: Optional[BaseLlamaCache] = None
+        self.cache: Optional[BaseFalconCache] = None
 
         self.n_threads = n_threads or max(multiprocessing.cpu_count() // 2, 1)
 
@@ -280,35 +299,35 @@ class Llama:
         if not os.path.exists(model_path):
             raise ValueError(f"Model path does not exist: {model_path}")
 
-        self.model = llama_cpp.llama_load_model_from_file(
+        self.model = falcon_cpp.falcon_load_model_from_file(
             self.model_path.encode("utf-8"), self.params
         )
         assert self.model is not None
 
-        self.ctx = llama_cpp.llama_new_context_with_model(self.model, self.params)
+        self.ctx = falcon_cpp.falcon_new_context_with_model(self.model, self.params)
 
         assert self.ctx is not None
 
         if self.lora_path:
-            if llama_cpp.llama_model_apply_lora_from_file(
-                self.model,
-                llama_cpp.c_char_p(self.lora_path.encode("utf-8")),
-                llama_cpp.c_char_p(self.lora_base.encode("utf-8"))
-                if self.lora_base is not None
-                else llama_cpp.c_char_p(0),
-                llama_cpp.c_int(self.n_threads),
+            if falcon_cpp.falcon_model_apply_lora_from_file(
+                    self.model,
+                    falcon_cpp.c_char_p(self.lora_path.encode("utf-8")),
+                    falcon_cpp.c_char_p(self.lora_base.encode("utf-8"))
+                    if self.lora_base is not None
+                    else falcon_cpp.c_char_p(0),
+                    falcon_cpp.c_int(self.n_threads),
             ):
                 raise RuntimeError(
                     f"Failed to apply LoRA from lora path: {self.lora_path} to base path: {self.lora_base}"
                 )
 
         if self.verbose:
-            print(llama_cpp.llama_print_system_info().decode("utf-8"), file=sys.stderr)
+            print(falcon_cpp.falcon_print_system_info().decode("utf-8"), file=sys.stderr)
 
         self._n_vocab = self.n_vocab()
         self._n_ctx = self.n_ctx()
-        size = llama_cpp.c_size_t(self._n_vocab)
-        sorted = llama_cpp.c_bool(False)
+        size = falcon_cpp.c_size_t(self._n_vocab)
+        sorted = falcon_cpp.c_bool(False)
         self._candidates_data = np.array(
             [],
             dtype=np.dtype(
@@ -316,14 +335,14 @@ class Llama:
             ),
         )
         self._candidates_data.resize(3, self._n_vocab, refcheck=False)
-        candidates = llama_cpp.llama_token_data_array(
-            data=self._candidates_data.ctypes.data_as(llama_cpp.llama_token_data_p),
+        candidates = falcon_cpp.falcon_token_data_array(
+            data=self._candidates_data.ctypes.data_as(falcon_cpp.falcon_token_data_p),
             size=size,
             sorted=sorted,
         )
         self._candidates = candidates
-        self._token_nl = Llama.token_nl()
-        self._token_eos = Llama.token_eos()
+        self._token_nl = Falcon.token_nl()
+        self._token_eos = Falcon.token_eos()
 
         self.n_tokens = 0
         self.input_ids: npt.NDArray[np.intc] = np.ndarray((n_ctx,), dtype=np.intc)
@@ -364,23 +383,23 @@ class Llama:
         """
         assert self.ctx is not None
         n_ctx = self._n_ctx
-        tokens = (llama_cpp.llama_token * n_ctx)()
-        n_tokens = llama_cpp.llama_tokenize(
+        tokens = (falcon_cpp.falcon_token * n_ctx)()
+        n_tokens = falcon_cpp.falcon_tokenize(
             self.ctx,
             text,
             tokens,
-            llama_cpp.c_int(n_ctx),
-            llama_cpp.c_bool(add_bos),
+            falcon_cpp.c_int(n_ctx),
+            falcon_cpp.c_bool(add_bos),
         )
         if n_tokens < 0:
             n_tokens = abs(n_tokens)
-            tokens = (llama_cpp.llama_token * n_tokens)()
-            n_tokens = llama_cpp.llama_tokenize(
+            tokens = (falcon_cpp.falcon_token * n_tokens)()
+            n_tokens = falcon_cpp.falcon_tokenize(
                 self.ctx,
                 text,
                 tokens,
-                llama_cpp.c_int(n_tokens),
-                llama_cpp.c_bool(add_bos),
+                falcon_cpp.c_int(n_tokens),
+                falcon_cpp.c_bool(add_bos),
             )
             if n_tokens < 0:
                 raise RuntimeError(
@@ -400,12 +419,12 @@ class Llama:
         assert self.ctx is not None
         output = b""
         for token in tokens:
-            output += llama_cpp.llama_token_to_str(
-                self.ctx, llama_cpp.llama_token(token)
+            output += falcon_cpp.falcon_token_to_str(
+                self.ctx, falcon_cpp.falcon_token(token)
             )
         return output
 
-    def set_cache(self, cache: Optional[BaseLlamaCache]):
+    def set_cache(self, cache: Optional[BaseFalconCache]):
         """Set the cache.
 
         Args:
@@ -429,39 +448,39 @@ class Llama:
             batch = tokens[i : min(len(tokens), i + self.n_batch)]
             n_past = min(n_ctx - len(batch), len(self._input_ids))
             n_tokens = len(batch)
-            return_code = llama_cpp.llama_eval(
+            return_code = falcon_cpp.falcon_eval(
                 ctx=self.ctx,
-                tokens=(llama_cpp.llama_token * len(batch))(*batch),
-                n_tokens=llama_cpp.c_int(n_tokens),
-                n_past=llama_cpp.c_int(n_past),
-                n_threads=llama_cpp.c_int(self.n_threads),
+                tokens=(falcon_cpp.falcon_token * len(batch))(*batch),
+                n_tokens=falcon_cpp.c_int(n_tokens),
+                n_past=falcon_cpp.c_int(n_past),
+                n_threads=falcon_cpp.c_int(self.n_threads),
             )
             if return_code != 0:
-                raise RuntimeError(f"llama_eval returned {return_code}")
+                raise RuntimeError(f"falcon_eval returned {return_code}")
             # Save tokens
             self.input_ids[self.n_tokens : self.n_tokens + n_tokens] = batch
             # Save logits
             rows = n_tokens if self.params.logits_all else 1
             cols = self._n_vocab
             offset = 0 if self.params.logits_all else n_tokens - 1 # NOTE: Only save the last token logits if logits_all is False
-            self.scores[self.n_tokens + offset: self.n_tokens + n_tokens, :].reshape(-1)[:] = llama_cpp.llama_get_logits(self.ctx)[:rows * cols]
+            self.scores[self.n_tokens + offset: self.n_tokens + n_tokens, :].reshape(-1)[:] = falcon_cpp.falcon_get_logits(self.ctx)[:rows * cols]
             # Update n_tokens
             self.n_tokens += n_tokens
 
     def _sample(
         self,
-        last_n_tokens_data,  # type: llama_cpp.Array[llama_cpp.llama_token]
-        last_n_tokens_size: llama_cpp.c_int,
-        top_k: llama_cpp.c_int,
-        top_p: llama_cpp.c_float,
-        temp: llama_cpp.c_float,
-        tfs_z: llama_cpp.c_float,
-        repeat_penalty: llama_cpp.c_float,
-        frequency_penalty: llama_cpp.c_float,
-        presence_penalty: llama_cpp.c_float,
-        mirostat_mode: llama_cpp.c_int,
-        mirostat_tau: llama_cpp.c_float,
-        mirostat_eta: llama_cpp.c_float,
+        last_n_tokens_data,  # type: falcon_cpp.Array[falcon_cpp.falcon_token]
+        last_n_tokens_size: falcon_cpp.c_int,
+        top_k: falcon_cpp.c_int,
+        top_p: falcon_cpp.c_float,
+        temp: falcon_cpp.c_float,
+        tfs_z: falcon_cpp.c_float,
+        repeat_penalty: falcon_cpp.c_float,
+        frequency_penalty: falcon_cpp.c_float,
+        presence_penalty: falcon_cpp.c_float,
+        mirostat_mode: falcon_cpp.c_int,
+        mirostat_tau: falcon_cpp.c_float,
+        mirostat_eta: falcon_cpp.c_float,
         penalize_nl: bool = True,
         logits_processor: Optional[LogitsProcessorList] = None,
     ):
@@ -469,9 +488,9 @@ class Llama:
         assert self.n_tokens > 0
         n_vocab = self._n_vocab
         n_ctx = self._n_ctx
-        top_k = llama_cpp.c_int(n_vocab) if top_k.value <= 0 else top_k
+        top_k = falcon_cpp.c_int(n_vocab) if top_k.value <= 0 else top_k
         last_n_tokens_size = (
-            llama_cpp.c_int(n_ctx)
+            falcon_cpp.c_int(n_ctx)
             if last_n_tokens_size.value < 0
             else last_n_tokens_size
         )
@@ -490,94 +509,94 @@ class Llama:
         candidates_data["id"] = np.arange(n_vocab, dtype=np.intc)  # type: ignore
         candidates_data["logit"] = logits
         candidates_data["p"] = np.zeros(n_vocab, dtype=np.single)
-        candidates.data = candidates_data.ctypes.data_as(llama_cpp.llama_token_data_p)
-        candidates.sorted = llama_cpp.c_bool(False)
-        candidates.size = llama_cpp.c_size_t(n_vocab)
-        llama_cpp.llama_sample_repetition_penalty(
+        candidates.data = candidates_data.ctypes.data_as(falcon_cpp.falcon_token_data_p)
+        candidates.sorted = falcon_cpp.c_bool(False)
+        candidates.size = falcon_cpp.c_size_t(n_vocab)
+        falcon_cpp.falcon_sample_repetition_penalty(
             ctx=self.ctx,
             last_tokens_data=last_n_tokens_data,
             last_tokens_size=last_n_tokens_size,
-            candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+            candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
             penalty=repeat_penalty,
         )
-        llama_cpp.llama_sample_frequency_and_presence_penalties(
+        falcon_cpp.falcon_sample_frequency_and_presence_penalties(
             ctx=self.ctx,
-            candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+            candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
             last_tokens_data=last_n_tokens_data,
             last_tokens_size=last_n_tokens_size,
             alpha_frequency=frequency_penalty,
             alpha_presence=presence_penalty,
         )
         if not penalize_nl:
-            candidates.data[self._token_nl].logit = llama_cpp.c_float(nl_logit)
+            candidates.data[self._token_nl].logit = falcon_cpp.c_float(nl_logit)
         if temp.value == 0.0:
-            return llama_cpp.llama_sample_token_greedy(
+            return falcon_cpp.falcon_sample_token_greedy(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
             )
         elif mirostat_mode.value == 1:
-            mirostat_mu = llama_cpp.c_float(2.0 * mirostat_tau.value)
-            mirostat_m = llama_cpp.c_int(100)
-            llama_cpp.llama_sample_temperature(
+            mirostat_mu = falcon_cpp.c_float(2.0 * mirostat_tau.value)
+            mirostat_m = falcon_cpp.c_int(100)
+            falcon_cpp.falcon_sample_temperature(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
                 temp=temp,
             )
-            return llama_cpp.llama_sample_token_mirostat(
+            return falcon_cpp.falcon_sample_token_mirostat(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
                 tau=mirostat_tau,
                 eta=mirostat_eta,
-                mu=llama_cpp.ctypes.byref(mirostat_mu),  # type: ignore
+                mu=falcon_cpp.ctypes.byref(mirostat_mu),  # type: ignore
                 m=mirostat_m,
             )
         elif mirostat_mode.value == 2:
-            mirostat_mu = llama_cpp.c_float(2.0 * mirostat_tau.value)
-            llama_cpp.llama_sample_temperature(
+            mirostat_mu = falcon_cpp.c_float(2.0 * mirostat_tau.value)
+            falcon_cpp.falcon_sample_temperature(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.pointer(candidates),
+                candidates=falcon_cpp.ctypes.pointer(candidates),
                 temp=temp,
             )
-            return llama_cpp.llama_sample_token_mirostat_v2(
+            return falcon_cpp.falcon_sample_token_mirostat_v2(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
                 tau=mirostat_tau,
                 eta=mirostat_eta,
-                mu=llama_cpp.ctypes.byref(mirostat_mu),  # type: ignore
+                mu=falcon_cpp.ctypes.byref(mirostat_mu),  # type: ignore
             )
         else:
-            llama_cpp.llama_sample_top_k(
+            falcon_cpp.falcon_sample_top_k(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
                 k=top_k,
-                min_keep=llama_cpp.c_size_t(1),
+                min_keep=falcon_cpp.c_size_t(1),
             )
-            llama_cpp.llama_sample_tail_free(
+            falcon_cpp.falcon_sample_tail_free(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
                 z=tfs_z,
-                min_keep=llama_cpp.c_size_t(1),
+                min_keep=falcon_cpp.c_size_t(1),
             )
-            llama_cpp.llama_sample_typical(
+            falcon_cpp.falcon_sample_typical(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
-                p=llama_cpp.c_float(1.0),
-                min_keep=llama_cpp.c_size_t(1),
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
+                p=falcon_cpp.c_float(1.0),
+                min_keep=falcon_cpp.c_size_t(1),
             )
-            llama_cpp.llama_sample_top_p(
+            falcon_cpp.falcon_sample_top_p(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
                 p=top_p,
-                min_keep=llama_cpp.c_size_t(1),
+                min_keep=falcon_cpp.c_size_t(1),
             )
-            llama_cpp.llama_sample_temperature(
+            falcon_cpp.falcon_sample_temperature(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
                 temp=temp,
             )
-            return llama_cpp.llama_sample_token(
+            return falcon_cpp.falcon_sample_token(
                 ctx=self.ctx,
-                candidates=llama_cpp.ctypes.byref(candidates),  # type: ignore
+                candidates=falcon_cpp.ctypes.byref(candidates),  # type: ignore
             )
 
     def sample(
@@ -607,24 +626,24 @@ class Llama:
             The sampled token.
         """
         assert self.ctx is not None
-        last_n_tokens_data = [llama_cpp.llama_token(0)] * max(
+        last_n_tokens_data = [falcon_cpp.falcon_token(0)] * max(
             0, self.last_n_tokens_size - len(self._input_ids)
         ) + self._input_ids[-self.last_n_tokens_size :].tolist()
         return self._sample(
-            last_n_tokens_data=(llama_cpp.llama_token * self.last_n_tokens_size)(
+            last_n_tokens_data=(falcon_cpp.falcon_token * self.last_n_tokens_size)(
                 *last_n_tokens_data
             ),
-            last_n_tokens_size=llama_cpp.c_int(self.last_n_tokens_size),
-            top_k=llama_cpp.c_int(top_k),
-            top_p=llama_cpp.c_float(top_p),
-            temp=llama_cpp.c_float(temp),
-            tfs_z=llama_cpp.c_float(tfs_z),
-            repeat_penalty=llama_cpp.c_float(repeat_penalty),
-            frequency_penalty=llama_cpp.c_float(frequency_penalty),
-            presence_penalty=llama_cpp.c_float(presence_penalty),
-            mirostat_mode=llama_cpp.c_int(mirostat_mode),
-            mirostat_tau=llama_cpp.c_float(mirostat_tau),
-            mirostat_eta=llama_cpp.c_float(mirostat_eta),
+            last_n_tokens_size=falcon_cpp.c_int(self.last_n_tokens_size),
+            top_k=falcon_cpp.c_int(top_k),
+            top_p=falcon_cpp.c_float(top_p),
+            temp=falcon_cpp.c_float(temp),
+            tfs_z=falcon_cpp.c_float(tfs_z),
+            repeat_penalty=falcon_cpp.c_float(repeat_penalty),
+            frequency_penalty=falcon_cpp.c_float(frequency_penalty),
+            presence_penalty=falcon_cpp.c_float(presence_penalty),
+            mirostat_mode=falcon_cpp.c_int(mirostat_mode),
+            mirostat_tau=falcon_cpp.c_float(mirostat_tau),
+            mirostat_eta=falcon_cpp.c_float(mirostat_eta),
             penalize_nl=penalize_nl,
             logits_processor=logits_processor,
         )
@@ -649,10 +668,10 @@ class Llama:
         """Create a generator of tokens from a prompt.
 
         Examples:
-            >>> llama = Llama("models/ggml-7b.bin")
-            >>> tokens = llama.tokenize(b"Hello, world!")
-            >>> for token in llama.generate(tokens, top_k=40, top_p=0.95, temp=1.0, repeat_penalty=1.1):
-            ...     print(llama.detokenize([token]))
+            >>> falcon = Falcon("models/ggml-7b.bin")
+            >>> tokens = falcon.tokenize(b"Hello, world!")
+            >>> for token in falcon.generate(tokens, top_k=40, top_p=0.95, temp=1.0, repeat_penalty=1.1):
+            ...     print(falcon.detokenize([token]))
 
         Args:
             tokens: The prompt tokens.
@@ -676,7 +695,7 @@ class Llama:
                     break
             if longest_prefix > 0:
                 if self.verbose:
-                    print("Llama.generate: prefix-match hit", file=sys.stderr)
+                    print("Falcon.generate: prefix-match hit", file=sys.stderr)
                 reset = False
                 tokens = tokens[longest_prefix:]
                 self.n_tokens = longest_prefix
@@ -724,11 +743,11 @@ class Llama:
 
         if self.params.embedding == False:
             raise RuntimeError(
-                "Llama model must be created with embedding=True to call this method"
+                "Falcon model must be created with embedding=True to call this method"
             )
 
         if self.verbose:
-            llama_cpp.llama_reset_timings(self.ctx)
+            falcon_cpp.falcon_reset_timings(self.ctx)
 
         if isinstance(input, str):
             inputs = [input]
@@ -743,8 +762,8 @@ class Llama:
             self.eval(tokens)
             n_tokens = len(tokens)
             total_tokens += n_tokens
-            embedding = llama_cpp.llama_get_embeddings(self.ctx)[
-                : llama_cpp.llama_n_embd(self.ctx)
+            embedding = falcon_cpp.falcon_get_embeddings(self.ctx)[
+                : falcon_cpp.falcon_n_embd(self.ctx)
             ]
 
             data.append(
@@ -755,7 +774,7 @@ class Llama:
                 }
             )
         if self.verbose:
-            llama_cpp.llama_print_timings(self.ctx)
+            falcon_cpp.falcon_print_timings(self.ctx)
 
         return {
             "object": "list",
@@ -806,7 +825,7 @@ class Llama:
         completion_id: str = f"cmpl-{str(uuid.uuid4())}"
         created: int = int(time.time())
         completion_tokens: List[int] = []
-        # Add blank space to start of prompt to match OG llama tokenizer
+        # Add blank space to start of prompt to match OG Falcon tokenizer
         prompt_tokens: List[int] = self.tokenize(b" " + prompt.encode("utf-8"))
         text: bytes = b""
         returned_tokens: int = 0
@@ -816,7 +835,7 @@ class Llama:
         model_name: str = model if model is not None else self.model_path
 
         if self.verbose:
-            llama_cpp.llama_reset_timings(self.ctx)
+            falcon_cpp.falcon_reset_timings(self.ctx)
 
         if len(prompt_tokens) > self._n_ctx:
             raise ValueError(
@@ -843,19 +862,19 @@ class Llama:
         if self.cache:
             try:
                 cache_item = self.cache[prompt_tokens]
-                cache_prefix_len = Llama.longest_token_prefix(
+                cache_prefix_len = Falcon.longest_token_prefix(
                     cache_item.input_ids.tolist(), prompt_tokens
                 )
-                eval_prefix_len = Llama.longest_token_prefix(
+                eval_prefix_len = Falcon.longest_token_prefix(
                     self._input_ids.tolist(), prompt_tokens
                 )
                 if cache_prefix_len > eval_prefix_len:
                     self.load_state(cache_item)
                     if self.verbose:
-                        print("Llama._create_completion: cache hit", file=sys.stderr)
+                        print("Falcon._create_completion: cache hit", file=sys.stderr)
             except KeyError:
                 if self.verbose:
-                    print("Llama._create_completion: cache miss", file=sys.stderr)
+                    print("Falcon._create_completion: cache miss", file=sys.stderr)
 
         finish_reason = "length"
         multibyte_fix = 0
@@ -937,7 +956,7 @@ class Llama:
                         )
                         token_offset = len(prompt_tokens) + returned_tokens
                         logits = self._scores[token_offset - 1, :].tolist()
-                        current_logprobs = Llama.logits_to_logprobs(logits)
+                        current_logprobs = Falcon.logits_to_logprobs(logits)
                         sorted_logprobs = list(
                             sorted(
                                 zip(current_logprobs, range(len(current_logprobs))),
@@ -991,7 +1010,7 @@ class Llama:
             finish_reason = "stop"
 
         if self.verbose:
-            llama_cpp.llama_print_timings(self.ctx)
+            falcon_cpp.falcon_print_timings(self.ctx)
 
         if stream:
             remaining_tokens = completion_tokens[returned_tokens:]
@@ -1016,7 +1035,7 @@ class Llama:
                     )
                     token_offset = len(prompt_tokens) + returned_tokens - 1
                     logits = self._scores[token_offset, :].tolist()
-                    current_logprobs = Llama.logits_to_logprobs(logits)
+                    current_logprobs = Falcon.logits_to_logprobs(logits)
                     sorted_logprobs = list(
                         sorted(
                             zip(current_logprobs, range(len(current_logprobs))),
@@ -1080,14 +1099,14 @@ class Llama:
                 }
             if self.cache:
                 if self.verbose:
-                    print("Llama._create_completion: cache save", file=sys.stderr)
+                    print("Falcon._create_completion: cache save", file=sys.stderr)
                 self.cache[prompt_tokens + completion_tokens] = self.save_state()
-                print("Llama._create_completion: cache saved", file=sys.stderr)
+                print("Falcon._create_completion: cache saved", file=sys.stderr)
             return
 
         if self.cache:
             if self.verbose:
-                print("Llama._create_completion: cache save", file=sys.stderr)
+                print("Falcon._create_completion: cache save", file=sys.stderr)
             self.cache[prompt_tokens + completion_tokens] = self.save_state()
 
         text_str = text.decode("utf-8", errors="ignore")
@@ -1118,7 +1137,7 @@ class Llama:
                 for token in all_tokens
             ]
             all_logprobs = [
-                Llama.logits_to_logprobs(row.tolist()) for row in self._scores
+                Falcon.logits_to_logprobs(row.tolist()) for row in self._scores
             ][token_offset:]
             for token, token_str, logprobs_token in zip(
                 all_tokens, all_token_strs, all_logprobs
@@ -1440,10 +1459,10 @@ class Llama:
 
     def __del__(self):
         if self.model is not None:
-            llama_cpp.llama_free_model(self.model)
+            falcon_cpp.falcon_free_model(self.model)
             self.model = None
         if self.ctx is not None:
-            llama_cpp.llama_free(self.ctx)
+            falcon_cpp.falcon_free(self.ctx)
             self.ctx = None
 
     def __getstate__(self):
@@ -1492,82 +1511,82 @@ class Llama:
             verbose=state["verbose"],
         )
 
-    def save_state(self) -> LlamaState:
+    def save_state(self) -> FalconState:
         assert self.ctx is not None
         if self.verbose:
-            print("Llama.save_state: saving llama state", file=sys.stderr)
-        state_size = llama_cpp.llama_get_state_size(self.ctx)
+            print("Falcon.save_state: saving falcon state", file=sys.stderr)
+        state_size = falcon_cpp.falcon_get_state_size(self.ctx)
         if self.verbose:
-            print(f"Llama.save_state: got state size: {state_size}", file=sys.stderr)
-        llama_state = (llama_cpp.c_uint8 * int(state_size))()
+            print(f"Falcon.save_state: got state size: {state_size}", file=sys.stderr)
+        falcon_state = (falcon_cpp.c_uint8 * int(state_size))()
         if self.verbose:
-            print("Llama.save_state: allocated state", file=sys.stderr)
-        n_bytes = llama_cpp.llama_copy_state_data(self.ctx, llama_state)
+            print("Falcon.save_state: allocated state", file=sys.stderr)
+        n_bytes = falcon_cpp.falcon_copy_state_data(self.ctx, falcon_state)
         if self.verbose:
-            print(f"Llama.save_state: copied llama state: {n_bytes}", file=sys.stderr)
+            print(f"Falcon.save_state: copied falcon state: {n_bytes}", file=sys.stderr)
         if int(n_bytes) > int(state_size):
-            raise RuntimeError("Failed to copy llama state data")
-        llama_state_compact = (llama_cpp.c_uint8 * int(n_bytes))()
-        llama_cpp.ctypes.memmove(llama_state_compact, llama_state, int(n_bytes))
+            raise RuntimeError("Failed to copy Falcon state data")
+        falcon_state_compact = (falcon_cpp.c_uint8 * int(n_bytes))()
+        falcon_cpp.ctypes.memmove(falcon_state_compact, falcon_state, int(n_bytes))
         if self.verbose:
             print(
-                f"Llama.save_state: saving {n_bytes} bytes of llama state",
+                f"Falcon.save_state: saving {n_bytes} bytes of falcon state",
                 file=sys.stderr,
             )
-        return LlamaState(
+        return FalconState(
             scores=self.scores.copy(),
             input_ids=self.input_ids.copy(),
             n_tokens=self.n_tokens,
-            llama_state=bytes(llama_state_compact),
-            llama_state_size=n_bytes,
+            falcon_state=bytes(falcon_state_compact),
+            falcon_state_size=n_bytes,
         )
 
-    def load_state(self, state: LlamaState) -> None:
+    def load_state(self, state: FalconState) -> None:
         assert self.ctx is not None
         self.scores = state.scores.copy()
         self.input_ids = state.input_ids.copy()
         self.n_tokens = state.n_tokens
-        state_size = state.llama_state_size
-        LLamaStateArrayType = llama_cpp.c_uint8 * state_size
-        llama_state = LLamaStateArrayType.from_buffer_copy(state.llama_state)
+        state_size = state.falcon_state_size
+        FalconStateArrayType = falcon_cpp.c_uint8 * state_size
+        falcon_state = FalconStateArrayType.from_buffer_copy(state.falcon_state)
 
-        if llama_cpp.llama_set_state_data(self.ctx, llama_state) != state_size:
-            raise RuntimeError("Failed to set llama state data")
+        if falcon_cpp.falcon_set_state_data(self.ctx, falcon_state) != state_size:
+            raise RuntimeError("Failed to set Falcon state data")
 
     def n_ctx(self) -> int:
         """Return the context window size."""
         assert self.ctx is not None
-        return llama_cpp.llama_n_ctx(self.ctx)
+        return falcon_cpp.falcon_n_ctx(self.ctx)
 
     def n_embd(self) -> int:
         """Return the embedding size."""
         assert self.ctx is not None
-        return llama_cpp.llama_n_embd(self.ctx)
+        return falcon_cpp.falcon_n_embd(self.ctx)
 
     def n_vocab(self) -> int:
         """Return the vocabulary size."""
         assert self.ctx is not None
-        return llama_cpp.llama_n_vocab(self.ctx)
+        return falcon_cpp.falcon_n_vocab(self.ctx)
 
-    def tokenizer(self) -> "LlamaTokenizer":
+    def tokenizer(self) -> "FalconTokenizer":
         """Return the tokenizer for this model."""
         assert self.ctx is not None
-        return LlamaTokenizer(self)
+        return FalconTokenizer(self)
 
     @staticmethod
     def token_eos() -> int:
         """Return the end-of-sequence token."""
-        return llama_cpp.llama_token_eos()
+        return falcon_cpp.falcon_token_eos()
 
     @staticmethod
     def token_bos() -> int:
         """Return the beginning-of-sequence token."""
-        return llama_cpp.llama_token_bos()
+        return falcon_cpp.falcon_token_bos()
 
     @staticmethod
     def token_nl() -> int:
         """Return the newline token."""
-        return llama_cpp.llama_token_nl()
+        return falcon_cpp.falcon_token_nl()
 
     @staticmethod
     def logits_to_logprobs(logits: List[float]) -> List[float]:
@@ -1586,18 +1605,18 @@ class Llama:
         return longest_prefix
 
 
-class LlamaTokenizer:
-    def __init__(self, llama: Llama):
-        self.llama = llama
+class FalconTokenizer:
+    def __init__(self, falcon: Falcon):
+        self.falcon = falcon
 
     def encode(self, text: str, add_bos: bool = True) -> List[int]:
-        return self.llama.tokenize(
+        return self.falcon.tokenize(
             text.encode("utf-8", errors="ignore"), add_bos=add_bos
         )
 
     def decode(self, tokens: List[int]) -> str:
-        return self.llama.detokenize(tokens).decode("utf-8", errors="ignore")
+        return self.falcon.detokenize(tokens).decode("utf-8", errors="ignore")
 
     @classmethod
-    def from_ggml_file(cls, path: str) -> "LlamaTokenizer":
-        return cls(Llama(model_path=path, vocab_only=True))
+    def from_ggml_file(cls, path: str) -> "FalconTokenizer":
+        return cls(Falcon(model_path=path, vocab_only=True))

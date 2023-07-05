@@ -3,7 +3,7 @@ update:
 	git submodule update --init --recursive
 
 update.vendor:
-	cd vendor/llama.cpp && git pull origin master
+	cd vendor/ggllm.cpp && git pull origin master
 
 build:
 	python3 setup.py develop
