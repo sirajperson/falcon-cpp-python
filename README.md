@@ -52,7 +52,7 @@ This allows you to use ggllm.cpp to inference falcon models with any OpenAI comp
 To install the server package and get started:
 
 ```bash
-python3 -m llama_cpp.server --model models/7B/ggml-model.bin
+python3 -m falcon_cpp.server --model models/7B/ggml-model.bin
 ```
 
 Navigate to [http://localhost:8000/docs](http://localhost:8000/docs) to see the OpenAPI documentation.
