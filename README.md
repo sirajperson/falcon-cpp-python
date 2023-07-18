@@ -14,7 +14,7 @@ This project is currently in alpha development and is not yet completely functio
 
 ## High-level API
 
-The high-level API provides a simple managed interface through the `Llama` class.
+The high-level API provides a simple managed interface through the `Falcon` class.
 
 Below is a short example demonstrating how to use the high-level API to generate text:
 
@@ -89,8 +89,8 @@ Again, this package is under active development and I welcome any contributions.
 To get started, clone the repository and install the package in development mode:
 
 ```bash
-git clone --recurse-submodules git@github.com:abetlen/llama-cpp-python.git
-cd llama-cpp-python
+git clone --recurse-submodules git@github.com:sirajperson/falcon-cpp-python.git
+cd falcon-cpp-python
 
 # Install with pip
 pip install -e .
