@@ -109,7 +109,7 @@ python3 setup.py develop
 # This Project is a fork of llama-cpp-python
 
 This project was originally llama-cpp-python and owes an immense thanks to @abetlen.
-This projects goal is to
+This project's goal is to:
 - Provide a simple process to install `ggllm.cpp` and access the full C API in `libfalcon.h` from Python
 - Provide a high-level Python API that can be used as a drop-in replacement for the OpenAI API so existing apps can be easily ported to use `ggllm.cpp`
 
