@@ -59,7 +59,7 @@ Navigate to [http://localhost:8000/docs](http://localhost:8000/docs) to see the 
 
 ## Low-level API
 
-The low-level API is a direct [`ctypes`](https://docs.python.org/3/library/ctypes.html) binding to the C API provided by `llama.cpp`.
+The low-level API is a direct [`ctypes`](https://docs.python.org/3/library/ctypes.html) binding to the C API provided by `ggllm.cpp`.
 The entire lowe-level API can be found in [falcon_cpp/falcon_cpp.py](https://github.com/sirajperson/falcon-cpp-python/blob/master/falcon_cpp/falcon_cpp.py) and directly mirrors the C API in [libfalcon.h](https://github.com/cmp-nct/ggllm.cpp/blob/master/libfalcon.h).
 
 Below is a short example demonstrating how to use the low-level API to tokenize a prompt:
