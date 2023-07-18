@@ -1,4 +1,4 @@
-#  Python Bindings for `ggllm.cpp`
+#  Python Bindings for `ggllm.cpp`, a library for loading and execution of inferences to falcon based models 
 
 
 Simple Python bindings for [`ggllm.cpp`](https://github.com/cmp-nct/ggllm.cpp) library.
