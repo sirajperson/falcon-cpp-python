@@ -71,7 +71,7 @@ def _load_shared_library(lib_base_name: str):
 
 
 # Specify the base name of the shared library to load
-_lib_base_name = "llama"
+_lib_base_name = "falcon"
 
 # Load the library
 _lib = _load_shared_library(_lib_base_name)
@@ -131,7 +131,6 @@ class falcon_token_data(Structure):
 
 
 falcon_token_data_p = POINTER(falcon_token_data)
-
 
 # typedef struct falcon_token_data_array {
 #     falcon_token_data * data;

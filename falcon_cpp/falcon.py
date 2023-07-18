@@ -39,8 +39,8 @@ class BaseFalconCache(ABC):
         raise NotImplementedError
 
     def _find_longest_prefix_key(
-        self,
-        key: Tuple[int, ...],
+            self,
+            key: Tuple[int, ...],
     ) -> Optional[Tuple[int, ...]]:
         pass
 
@@ -70,8 +70,8 @@ class FalconRAMCache(BaseFalconCache):
         return sum([state.falcon_state_size for state in self.cache_state.values()])
 
     def _find_longest_prefix_key(
-        self,
-        key: Tuple[int, ...],
+            self,
+            key: Tuple[int, ...],
     ) -> Optional[Tuple[int, ...]]:
         min_len = 0
         min_key = None
@@ -113,7 +113,7 @@ class FalconDiskCache(BaseFalconCache):
     """Cache for a falcon.cpp model using disk."""
 
     def __init__(
-        self, cache_dir: str = ".cache/falcon_cache", capacity_bytes: int = (2 << 30)
+            self, cache_dir: str = ".cache/falcon_cache", capacity_bytes: int = (2 << 30)
     ):
         super().__init__(capacity_bytes)
         self.cache = diskcache.Cache(cache_dir)
@@ -123,8 +123,8 @@ class FalconDiskCache(BaseFalconCache):
         return int(self.cache.volume())  # type: ignore
 
     def _find_longest_prefix_key(
-        self,
-        key: Tuple[int, ...],
+            self,
+            key: Tuple[int, ...],
     ) -> Optional[Tuple[int, ...]]:
         min_len = 0
         min_key: Optional[Tuple[int, ...]] = None
@@ -165,12 +165,12 @@ class FalconDiskCache(BaseFalconCache):
 
 class FalconState:
     def __init__(
-        self,
-        input_ids: npt.NDArray[np.intc],
-        scores: npt.NDArray[np.single],
-        n_tokens: int,
-        falcon_state: bytes,
-        falcon_state_size: int,
+            self,
+            input_ids: npt.NDArray[np.intc],
+            scores: npt.NDArray[np.single],
+            n_tokens: int,
+            falcon_state: bytes,
+            falcon_state_size: int,
     ):
         self.input_ids = input_ids
         self.scores = scores
@@ -201,27 +201,27 @@ class Falcon:
     """High-level Python wrapper for a falcon.cpp model."""
 
     def __init__(
-        self,
-        model_path: str,
-        # NOTE: These parameters are likely to change in the future.
-        n_ctx: int = 512,
-        n_parts: int = -1,
-        n_gpu_layers: int = 0,
-        seed: int = 1337,
-        f16_kv: bool = True,
-        logits_all: bool = False,
-        vocab_only: bool = False,
-        use_mmap: bool = True,
-        use_mlock: bool = False,
-        embedding: bool = False,
-        n_threads: Optional[int] = None,
-        n_batch: int = 512,
-        last_n_tokens_size: int = 64,
-        lora_base: Optional[str] = None,
-        lora_path: Optional[str] = None,
-        low_vram: bool = False,
-        verbose: bool = True,
-        ):
+            self,
+            model_path: str,
+            # NOTE: These parameters are likely to change in the future.
+            n_ctx: int = 512,
+            n_parts: int = -1,
+            n_gpu_layers: int = 0,
+            seed: int = 1337,
+            f16_kv: bool = True,
+            logits_all: bool = False,
+            vocab_only: bool = False,
+            use_mmap: bool = True,
+            use_mlock: bool = False,
+            embedding: bool = False,
+            n_threads: Optional[int] = None,
+            n_batch: int = 512,
+            last_n_tokens_size: int = 64,
+            lora_base: Optional[str] = None,
+            lora_path: Optional[str] = None,
+            low_vram: bool = False,
+            verbose: bool = True,
+    ):
 
         # TODO: Add the parameters for
         '''
@@ -242,7 +242,7 @@ class Falcon:
         '''
 
         """Load a Falcon model from `model_path`.
-        
+
                 Args:
                     model_path: Path to the model.
                     n_ctx: Maximum context size.
@@ -260,10 +260,10 @@ class Falcon:
                     lora_base: Optional path to base model, useful if using a quantized base model and you want to apply LoRA to an f16 model.
                     lora_path: Path to a LoRA file to apply to the model.
                     verbose: Print verbose output to stderr.
-        
+
                 Raises:
                     ValueError: If the model path does not exist.
-        
+
                 Returns:
                     A falcon instance.
                 """
@@ -445,7 +445,7 @@ class Falcon:
         assert self.ctx is not None
         n_ctx = self._n_ctx
         for i in range(0, len(tokens), self.n_batch):
-            batch = tokens[i : min(len(tokens), i + self.n_batch)]
+            batch = tokens[i: min(len(tokens), i + self.n_batch)]
             n_past = min(n_ctx - len(batch), len(self._input_ids))
             n_tokens = len(batch)
             return_code = falcon_cpp.falcon_eval(
@@ -458,31 +458,32 @@ class Falcon:
             if return_code != 0:
                 raise RuntimeError(f"falcon_eval returned {return_code}")
             # Save tokens
-            self.input_ids[self.n_tokens : self.n_tokens + n_tokens] = batch
+            self.input_ids[self.n_tokens: self.n_tokens + n_tokens] = batch
             # Save logits
             rows = n_tokens if self.params.logits_all else 1
             cols = self._n_vocab
-            offset = 0 if self.params.logits_all else n_tokens - 1 # NOTE: Only save the last token logits if logits_all is False
-            self.scores[self.n_tokens + offset: self.n_tokens + n_tokens, :].reshape(-1)[:] = falcon_cpp.falcon_get_logits(self.ctx)[:rows * cols]
+            offset = 0 if self.params.logits_all else n_tokens - 1  # NOTE: Only save the last token logits if logits_all is False
+            self.scores[self.n_tokens + offset: self.n_tokens + n_tokens, :].reshape(-1)[
+            :] = falcon_cpp.falcon_get_logits(self.ctx)[:rows * cols]
             # Update n_tokens
             self.n_tokens += n_tokens
 
     def _sample(
-        self,
-        last_n_tokens_data,  # type: falcon_cpp.Array[falcon_cpp.falcon_token]
-        last_n_tokens_size: falcon_cpp.c_int,
-        top_k: falcon_cpp.c_int,
-        top_p: falcon_cpp.c_float,
-        temp: falcon_cpp.c_float,
-        tfs_z: falcon_cpp.c_float,
-        repeat_penalty: falcon_cpp.c_float,
-        frequency_penalty: falcon_cpp.c_float,
-        presence_penalty: falcon_cpp.c_float,
-        mirostat_mode: falcon_cpp.c_int,
-        mirostat_tau: falcon_cpp.c_float,
-        mirostat_eta: falcon_cpp.c_float,
-        penalize_nl: bool = True,
-        logits_processor: Optional[LogitsProcessorList] = None,
+            self,
+            last_n_tokens_data,  # type: falcon_cpp.Array[falcon_cpp.falcon_token]
+            last_n_tokens_size: falcon_cpp.c_int,
+            top_k: falcon_cpp.c_int,
+            top_p: falcon_cpp.c_float,
+            temp: falcon_cpp.c_float,
+            tfs_z: falcon_cpp.c_float,
+            repeat_penalty: falcon_cpp.c_float,
+            frequency_penalty: falcon_cpp.c_float,
+            presence_penalty: falcon_cpp.c_float,
+            mirostat_mode: falcon_cpp.c_int,
+            mirostat_tau: falcon_cpp.c_float,
+            mirostat_eta: falcon_cpp.c_float,
+            penalize_nl: bool = True,
+            logits_processor: Optional[LogitsProcessorList] = None,
     ):
         assert self.ctx is not None
         assert self.n_tokens > 0
@@ -600,19 +601,19 @@ class Falcon:
             )
 
     def sample(
-        self,
-        top_k: int = 40,
-        top_p: float = 0.95,
-        temp: float = 0.80,
-        repeat_penalty: float = 1.1,
-        frequency_penalty: float = 0.0,
-        presence_penalty: float = 0.0,
-        tfs_z: float = 1.0,
-        mirostat_mode: int = 0,
-        mirostat_eta: float = 0.1,
-        mirostat_tau: float = 5.0,
-        penalize_nl: bool = True,
-        logits_processor: Optional[LogitsProcessorList] = None,
+            self,
+            top_k: int = 40,
+            top_p: float = 0.95,
+            temp: float = 0.80,
+            repeat_penalty: float = 1.1,
+            frequency_penalty: float = 0.0,
+            presence_penalty: float = 0.0,
+            tfs_z: float = 1.0,
+            mirostat_mode: int = 0,
+            mirostat_eta: float = 0.1,
+            mirostat_tau: float = 5.0,
+            penalize_nl: bool = True,
+            logits_processor: Optional[LogitsProcessorList] = None,
     ):
         """Sample a token from the model.
 
@@ -628,7 +629,7 @@ class Falcon:
         assert self.ctx is not None
         last_n_tokens_data = [falcon_cpp.falcon_token(0)] * max(
             0, self.last_n_tokens_size - len(self._input_ids)
-        ) + self._input_ids[-self.last_n_tokens_size :].tolist()
+        ) + self._input_ids[-self.last_n_tokens_size:].tolist()
         return self._sample(
             last_n_tokens_data=(falcon_cpp.falcon_token * self.last_n_tokens_size)(
                 *last_n_tokens_data
@@ -649,21 +650,21 @@ class Falcon:
         )
 
     def generate(
-        self,
-        tokens: Sequence[int],
-        top_k: int = 40,
-        top_p: float = 0.95,
-        temp: float = 0.80,
-        repeat_penalty: float = 1.1,
-        reset: bool = True,
-        frequency_penalty: float = 0.0,
-        presence_penalty: float = 0.0,
-        tfs_z: float = 1.0,
-        mirostat_mode: int = 0,
-        mirostat_tau: float = 5.0,
-        mirostat_eta: float = 0.1,
-        logits_processor: Optional[LogitsProcessorList] = None,
-        stopping_criteria: Optional[StoppingCriteriaList] = None,
+            self,
+            tokens: Sequence[int],
+            top_k: int = 40,
+            top_p: float = 0.95,
+            temp: float = 0.80,
+            repeat_penalty: float = 1.1,
+            reset: bool = True,
+            frequency_penalty: float = 0.0,
+            presence_penalty: float = 0.0,
+            tfs_z: float = 1.0,
+            mirostat_mode: int = 0,
+            mirostat_tau: float = 5.0,
+            mirostat_eta: float = 0.1,
+            logits_processor: Optional[LogitsProcessorList] = None,
+            stopping_criteria: Optional[StoppingCriteriaList] = None,
     ) -> Generator[int, Optional[Sequence[int]], None]:
         """Create a generator of tokens from a prompt.
 
@@ -719,7 +720,7 @@ class Falcon:
                 logits_processor=logits_processor,
             )
             if stopping_criteria is not None and stopping_criteria(
-                self._input_ids.tolist(), self._scores[-1, :].tolist()
+                    self._input_ids.tolist(), self._scores[-1, :].tolist()
             ):
                 return
             tokens_or_none = yield token
@@ -728,7 +729,7 @@ class Falcon:
                 tokens.extend(tokens_or_none)
 
     def create_embedding(
-        self, input: Union[str, List[str]], model: Optional[str] = None
+            self, input: Union[str, List[str]], model: Optional[str] = None
     ) -> Embedding:
         """Embed a string.
 
@@ -763,8 +764,8 @@ class Falcon:
             n_tokens = len(tokens)
             total_tokens += n_tokens
             embedding = falcon_cpp.falcon_get_embeddings(self.ctx)[
-                : falcon_cpp.falcon_n_embd(self.ctx)
-            ]
+                        : falcon_cpp.falcon_n_embd(self.ctx)
+                        ]
 
             data.append(
                 {
@@ -798,27 +799,27 @@ class Falcon:
         return list(map(float, self.create_embedding(input)["data"][0]["embedding"]))
 
     def _create_completion(
-        self,
-        prompt: str,
-        suffix: Optional[str] = None,
-        max_tokens: int = 16,
-        temperature: float = 0.8,
-        top_p: float = 0.95,
-        logprobs: Optional[int] = None,
-        echo: bool = False,
-        stop: Optional[Union[str, List[str]]] = [],
-        frequency_penalty: float = 0.0,
-        presence_penalty: float = 0.0,
-        repeat_penalty: float = 1.1,
-        top_k: int = 40,
-        stream: bool = False,
-        tfs_z: float = 1.0,
-        mirostat_mode: int = 0,
-        mirostat_tau: float = 5.0,
-        mirostat_eta: float = 0.1,
-        model: Optional[str] = None,
-        stopping_criteria: Optional[StoppingCriteriaList] = None,
-        logits_processor: Optional[LogitsProcessorList] = None,
+            self,
+            prompt: str,
+            suffix: Optional[str] = None,
+            max_tokens: int = 16,
+            temperature: float = 0.8,
+            top_p: float = 0.95,
+            logprobs: Optional[int] = None,
+            echo: bool = False,
+            stop: Optional[Union[str, List[str]]] = [],
+            frequency_penalty: float = 0.0,
+            presence_penalty: float = 0.0,
+            repeat_penalty: float = 1.1,
+            top_k: int = 40,
+            stream: bool = False,
+            tfs_z: float = 1.0,
+            mirostat_mode: int = 0,
+            mirostat_tau: float = 5.0,
+            mirostat_eta: float = 0.1,
+            model: Optional[str] = None,
+            stopping_criteria: Optional[StoppingCriteriaList] = None,
+            logits_processor: Optional[LogitsProcessorList] = None,
     ) -> Union[Iterator[Completion], Iterator[CompletionChunk]]:
         assert self.ctx is not None
 
@@ -879,19 +880,19 @@ class Falcon:
         finish_reason = "length"
         multibyte_fix = 0
         for token in self.generate(
-            prompt_tokens,
-            top_k=top_k,
-            top_p=top_p,
-            temp=temperature,
-            tfs_z=tfs_z,
-            mirostat_mode=mirostat_mode,
-            mirostat_tau=mirostat_tau,
-            mirostat_eta=mirostat_eta,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            repeat_penalty=repeat_penalty,
-            stopping_criteria=stopping_criteria,
-            logits_processor=logits_processor,
+                prompt_tokens,
+                top_k=top_k,
+                top_p=top_p,
+                temp=temperature,
+                tfs_z=tfs_z,
+                mirostat_mode=mirostat_mode,
+                mirostat_tau=mirostat_tau,
+                mirostat_eta=mirostat_eta,
+                frequency_penalty=frequency_penalty,
+                presence_penalty=presence_penalty,
+                repeat_penalty=repeat_penalty,
+                stopping_criteria=stopping_criteria,
+                logits_processor=logits_processor,
         ):
             if token == self._token_eos:
                 text = self.detokenize(completion_tokens)
@@ -943,7 +944,7 @@ class Falcon:
                     token_end_position += len(self.detokenize([token]))
                     # Check if stop sequence is in the token
                     if token_end_position >= (
-                        remaining_length - first_stop_position - 1
+                            remaining_length - first_stop_position - 1
                     ):
                         break
                     logprobs_or_none: Optional[CompletionLogprobs] = None
@@ -1004,7 +1005,7 @@ class Falcon:
                 break
 
         if stopping_criteria is not None and stopping_criteria(
-            self._input_ids.tolist(), self._scores[-1, :].tolist()
+                self._input_ids.tolist(), self._scores[-1, :].tolist()
         ):
             text = self.detokenize(completion_tokens)
             finish_reason = "stop"
@@ -1069,8 +1070,8 @@ class Falcon:
                         "choices": [
                             {
                                 "text": last_text[
-                                    : len(last_text) - (token_end_position - end)
-                                ].decode("utf-8", errors="ignore"),
+                                        : len(last_text) - (token_end_position - end)
+                                        ].decode("utf-8", errors="ignore"),
                                 "index": 0,
                                 "logprobs": logprobs_or_none,
                                 "finish_reason": finish_reason,
@@ -1137,10 +1138,10 @@ class Falcon:
                 for token in all_tokens
             ]
             all_logprobs = [
-                Falcon.logits_to_logprobs(row.tolist()) for row in self._scores
-            ][token_offset:]
+                               Falcon.logits_to_logprobs(row.tolist()) for row in self._scores
+                           ][token_offset:]
             for token, token_str, logprobs_token in zip(
-                all_tokens, all_token_strs, all_logprobs
+                    all_tokens, all_token_strs, all_logprobs
             ):
                 text_offsets.append(text_offset)
                 text_offset += len(token_str)
@@ -1191,27 +1192,27 @@ class Falcon:
         }
 
     def create_completion(
-        self,
-        prompt: str,
-        suffix: Optional[str] = None,
-        max_tokens: int = 128,
-        temperature: float = 0.8,
-        top_p: float = 0.95,
-        logprobs: Optional[int] = None,
-        echo: bool = False,
-        stop: Optional[Union[str, List[str]]] = [],
-        frequency_penalty: float = 0.0,
-        presence_penalty: float = 0.0,
-        repeat_penalty: float = 1.1,
-        top_k: int = 40,
-        stream: bool = False,
-        tfs_z: float = 1.0,
-        mirostat_mode: int = 0,
-        mirostat_tau: float = 5.0,
-        mirostat_eta: float = 0.1,
-        model: Optional[str] = None,
-        stopping_criteria: Optional[StoppingCriteriaList] = None,
-        logits_processor: Optional[LogitsProcessorList] = None,
+            self,
+            prompt: str,
+            suffix: Optional[str] = None,
+            max_tokens: int = 128,
+            temperature: float = 0.8,
+            top_p: float = 0.95,
+            logprobs: Optional[int] = None,
+            echo: bool = False,
+            stop: Optional[Union[str, List[str]]] = [],
+            frequency_penalty: float = 0.0,
+            presence_penalty: float = 0.0,
+            repeat_penalty: float = 1.1,
+            top_k: int = 40,
+            stream: bool = False,
+            tfs_z: float = 1.0,
+            mirostat_mode: int = 0,
+            mirostat_tau: float = 5.0,
+            mirostat_eta: float = 0.1,
+            model: Optional[str] = None,
+            stopping_criteria: Optional[StoppingCriteriaList] = None,
+            logits_processor: Optional[LogitsProcessorList] = None,
     ) -> Union[Completion, Iterator[CompletionChunk]]:
         """Generate text from a prompt.
 
@@ -1264,27 +1265,27 @@ class Falcon:
         return completion
 
     def __call__(
-        self,
-        prompt: str,
-        suffix: Optional[str] = None,
-        max_tokens: int = 128,
-        temperature: float = 0.8,
-        top_p: float = 0.95,
-        logprobs: Optional[int] = None,
-        echo: bool = False,
-        stop: Optional[Union[str, List[str]]] = [],
-        frequency_penalty: float = 0.0,
-        presence_penalty: float = 0.0,
-        repeat_penalty: float = 1.1,
-        top_k: int = 40,
-        stream: bool = False,
-        tfs_z: float = 1.0,
-        mirostat_mode: int = 0,
-        mirostat_tau: float = 5.0,
-        mirostat_eta: float = 0.1,
-        model: Optional[str] = None,
-        stopping_criteria: Optional[StoppingCriteriaList] = None,
-        logits_processor: Optional[LogitsProcessorList] = None,
+            self,
+            prompt: str,
+            suffix: Optional[str] = None,
+            max_tokens: int = 128,
+            temperature: float = 0.8,
+            top_p: float = 0.95,
+            logprobs: Optional[int] = None,
+            echo: bool = False,
+            stop: Optional[Union[str, List[str]]] = [],
+            frequency_penalty: float = 0.0,
+            presence_penalty: float = 0.0,
+            repeat_penalty: float = 1.1,
+            top_k: int = 40,
+            stream: bool = False,
+            tfs_z: float = 1.0,
+            mirostat_mode: int = 0,
+            mirostat_tau: float = 5.0,
+            mirostat_eta: float = 0.1,
+            model: Optional[str] = None,
+            stopping_criteria: Optional[StoppingCriteriaList] = None,
+            logits_processor: Optional[LogitsProcessorList] = None,
     ) -> Union[Completion, Iterator[CompletionChunk]]:
         """Generate text from a prompt.
 
@@ -1332,7 +1333,7 @@ class Falcon:
         )
 
     def _convert_text_completion_to_chat(
-        self, completion: Completion
+            self, completion: Completion
     ) -> ChatCompletion:
         return {
             "id": "chat" + completion["id"],
@@ -1353,8 +1354,8 @@ class Falcon:
         }
 
     def _convert_text_completion_chunks_to_chat(
-        self,
-        chunks: Iterator[CompletionChunk],
+            self,
+            chunks: Iterator[CompletionChunk],
     ) -> Iterator[ChatCompletionChunk]:
         for i, chunk in enumerate(chunks):
             if i == 0:
@@ -1390,23 +1391,23 @@ class Falcon:
             }
 
     def create_chat_completion(
-        self,
-        messages: List[ChatCompletionMessage],
-        temperature: float = 0.2,
-        top_p: float = 0.95,
-        top_k: int = 40,
-        stream: bool = False,
-        stop: Optional[Union[str, List[str]]] = [],
-        max_tokens: int = 256,
-        presence_penalty: float = 0.0,
-        frequency_penalty: float = 0.0,
-        repeat_penalty: float = 1.1,
-        tfs_z: float = 1.0,
-        mirostat_mode: int = 0,
-        mirostat_tau: float = 5.0,
-        mirostat_eta: float = 0.1,
-        model: Optional[str] = None,
-        logits_processor: Optional[LogitsProcessorList] = None,
+            self,
+            messages: List[ChatCompletionMessage],
+            temperature: float = 0.2,
+            top_p: float = 0.95,
+            top_k: int = 40,
+            stream: bool = False,
+            stop: Optional[Union[str, List[str]]] = [],
+            max_tokens: int = 256,
+            presence_penalty: float = 0.0,
+            frequency_penalty: float = 0.0,
+            repeat_penalty: float = 1.1,
+            tfs_z: float = 1.0,
+            mirostat_mode: int = 0,
+            mirostat_tau: float = 5.0,
+            mirostat_eta: float = 0.1,
+            model: Optional[str] = None,
+            logits_processor: Optional[LogitsProcessorList] = None,
     ) -> Union[ChatCompletion, Iterator[ChatCompletionChunk]]:
         """Generate a chat completion from a list of messages.
 
