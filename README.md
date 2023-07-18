@@ -1,13 +1,7 @@
-# 🦙 Python Bindings for `llama.cpp`
+#  Python Bindings for `ggllm.cpp`
 
-[![Documentation Status](https://readthedocs.org/projects/llama-cpp-python/badge/?version=latest)](https://llama-cpp-python.readthedocs.io/en/latest/?badge=latest)
-[![Tests](https://github.com/abetlen/llama-cpp-python/actions/workflows/test.yaml/badge.svg?branch=main)](https://github.com/abetlen/llama-cpp-python/actions/workflows/test.yaml)
-[![PyPI](https://img.shields.io/pypi/v/llama-cpp-python)](https://pypi.org/project/llama-cpp-python/)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/llama-cpp-python)](https://pypi.org/project/llama-cpp-python/)
-[![PyPI - License](https://img.shields.io/pypi/l/llama-cpp-python)](https://pypi.org/project/llama-cpp-python/)
-[![PyPI - Downloads](https://img.shields.io/pypi/dm/llama-cpp-python)](https://pypi.org/project/llama-cpp-python/)
 
-Simple Python bindings for **@ggerganov's** [`llama.cpp`](https://github.com/ggerganov/llama.cpp) library.
+Simple Python bindings for [`ggllm.cpp`](https://github.com/cmp-nct/ggllm.cpp) library.
 This package provides:
 
 - Low-level access to C API via `ctypes` interface.
@@ -15,63 +9,8 @@ This package provides:
   - OpenAI-like API
   - LangChain compatibility
 
-Documentation is available at [https://llama-cpp-python.readthedocs.io/en/latest](https://llama-cpp-python.readthedocs.io/en/latest).
+This project is currently in alpha development and is not yet completely functional. Any contributions are warmly welcomed.
 
-
-## Installation from PyPI (recommended)
-
-Install from PyPI (requires a c compiler):
-
-```bash
-pip install llama-cpp-python
-```
-
-The above command will attempt to install the package and build `llama.cpp` from source.
-This is the recommended installation method as it ensures that `llama.cpp` is built with the available optimizations for your system.
-
-If you have previously installed `llama-cpp-python` through pip and want to upgrade your version or rebuild the package with different  compiler options, please add the following flags to ensure that the package is rebuilt correctly:
-
-```bash
-pip install llama-cpp-python --force-reinstall --upgrade --no-cache-dir
-```
-
-Note: If you are using Apple Silicon (M1) Mac, make sure you have installed a version of Python that supports arm64 architecture. For example:
-```
-wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh
-bash Miniforge3-MacOSX-arm64.sh
-```
-Otherwise, while installing it will build the llama.ccp x86 version which will be 10x slower on Apple Silicon (M1) Mac.
-
-### Installation with OpenBLAS / cuBLAS / CLBlast / Metal
-
-`llama.cpp` supports multiple BLAS backends for faster processing.
-Use the `FORCE_CMAKE=1` environment variable to force the use of `cmake` and install the pip package for the desired BLAS backend.
-
-To install with OpenBLAS, set the `LLAMA_OPENBLAS=1` environment variable before installing:
-
-```bash
-CMAKE_ARGS="-DLLAMA_OPENBLAS=on" FORCE_CMAKE=1 pip install llama-cpp-python
-```
-
-To install with cuBLAS, set the `LLAMA_CUBLAS=1` environment variable before installing:
-
-```bash
-CMAKE_ARGS="-DLLAMA_CUBLAS=on" FORCE_CMAKE=1 pip install llama-cpp-python
-```
-
-To install with CLBlast, set the `LLAMA_CLBLAST=1` environment variable before installing:
-
-```bash
-CMAKE_ARGS="-DLLAMA_CLBLAST=on" FORCE_CMAKE=1 pip install llama-cpp-python
-```
-
-To install with Metal (MPS), set the `LLAMA_METAL=on` environment variable before installing:
-
-```bash
-CMAKE_ARGS="-DLLAMA_METAL=on" FORCE_CMAKE=1 pip install llama-cpp-python
-```
-
-Detailed MacOS Metal GPU install documentation is available at [docs/install/macos.md](docs/install/macos.md)
 
 ## High-level API
 
@@ -80,8 +19,8 @@ The high-level API provides a simple managed interface through the `Llama` class
 Below is a short example demonstrating how to use the high-level API to generate text:
 
 ```python
->>> from llama_cpp import Llama
->>> llm = Llama(model_path="./models/7B/ggml-model.bin")
+>>> from falcon_cpp import Falcon
+>>> llm = Falcon(model_path="./models/7B/ggml-model.bin")
 >>> output = llm("Q: Name the planets in the solar system? A: ", max_tokens=32, stop=["Q:", "\n"], echo=True)
 >>> print(output)
 {
@@ -107,57 +46,45 @@ Below is a short example demonstrating how to use the high-level API to generate
 
 ## Web Server
 
-`llama-cpp-python` offers a web server which aims to act as a drop-in replacement for the OpenAI API.
-This allows you to use llama.cpp compatible models with any OpenAI compatible client (language libraries, services, etc).
+`falcon-cpp-python` offers a web server which aims to act as a drop-in replacement for the OpenAI API.
+This allows you to use ggllm.cpp to inference falcon models with any OpenAI compatible client (language libraries, services, etc).
 
 To install the server package and get started:
 
 ```bash
-pip install llama-cpp-python[server]
 python3 -m llama_cpp.server --model models/7B/ggml-model.bin
 ```
 
 Navigate to [http://localhost:8000/docs](http://localhost:8000/docs) to see the OpenAPI documentation.
 
-## Docker image
-
-A Docker image is available on [GHCR](https://ghcr.io/abetlen/llama-cpp-python). To run the server:
-
-```bash
-docker run --rm -it -p 8000:8000 -v /path/to/models:/models -e MODEL=/models/ggml-model-name.bin ghcr.io/abetlen/llama-cpp-python:latest
-```
-
 ## Low-level API
 
 The low-level API is a direct [`ctypes`](https://docs.python.org/3/library/ctypes.html) binding to the C API provided by `llama.cpp`.
-The entire lowe-level API can be found in [llama_cpp/llama_cpp.py](https://github.com/abetlen/llama-cpp-python/blob/master/llama_cpp/llama_cpp.py) and directly mirrors the C API in [llama.h](https://github.com/ggerganov/llama.cpp/blob/master/llama.h).
+The entire lowe-level API can be found in [falcon_cpp/falcon_cpp.py](https://github.com/sirajperson/falcon-cpp-python/blob/master/falcon_cpp/falcon_cpp.py) and directly mirrors the C API in [libfalcon.h](https://github.com/cmp-nct/ggllm.cpp/blob/master/libfalcon.h).
 
 Below is a short example demonstrating how to use the low-level API to tokenize a prompt:
 
 ```python
->>> import llama_cpp
+>>> import falcon_cpp
 >>> import ctypes
->>> params = llama_cpp.llama_context_default_params()
+>>> params = falcon_cpp.falcon_context_default_params()
 # use bytes for char * params
->>> ctx = llama_cpp.llama_init_from_file(b"./models/7b/ggml-model.bin", params)
+>>> ctx = falcon_cpp.falcon_init_backend("./models/7b/ggml-model.bin", params)
 >>> max_tokens = params.n_ctx
 # use ctypes arrays for array params
->>> tokens = (llama_cpp.llama_token * int(max_tokens))()
->>> n_tokens = llama_cpp.llama_tokenize(ctx, b"Q: Name the planets in the solar system? A: ", tokens, max_tokens, add_bos=llama_cpp.c_bool(True))
->>> llama_cpp.llama_free(ctx)
+>>> tokens = (falcon_cpp.falcon_token * int(max_tokens))()
+>>> n_tokens = falcon_cpp.falcon_tokenize(ctx, b"Q: Name the planets in the solar system? A: ", tokens, max_tokens, add_bos=llama_cpp.c_bool(True))
+>>> falcon_cpp.falcon_free(ctx)
 ```
 
 Check out the [examples folder](examples/low_level_api) for more examples of using the low-level API.
 
-
 # Documentation
-
-Documentation is available at [https://abetlen.github.io/llama-cpp-python](https://abetlen.github.io/llama-cpp-python).
-If you find any issues with the documentation, please open an issue or submit a PR.
+Coming soon...
 
 # Development
 
-This package is under active development and I welcome any contributions.
+Again, this package is under active development and I welcome any contributions.
 
 To get started, clone the repository and install the package in development mode:
 
@@ -179,12 +106,12 @@ poetry install --all-extras
 python3 setup.py develop
 ```
 
-# How does this compare to other Python bindings of `llama.cpp`?
+# This Project is a fork of llama-cpp-python
 
-I originally wrote this package for my own use with two goals in mind:
-
-- Provide a simple process to install `llama.cpp` and access the full C API in `llama.h` from Python
-- Provide a high-level Python API that can be used as a drop-in replacement for the OpenAI API so existing apps can be easily ported to use `llama.cpp`
+This project was originally llama-cpp-python and owes an immense thanks to @abetlen.
+This projects goal is to
+- Provide a simple process to install `ggllm.cpp` and access the full C API in `libfalcon.h` from Python
+- Provide a high-level Python API that can be used as a drop-in replacement for the OpenAI API so existing apps can be easily ported to use `ggllm.cpp`
 
 Any contributions and changes to this package will be made with these goals in mind.
 
