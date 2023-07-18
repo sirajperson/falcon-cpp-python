@@ -12,17 +12,17 @@ assignees: ''
 Please answer the following questions for yourself before submitting an issue.
 
 - [ ] I am running the latest code. Development is very rapid so there are no tagged versions as of now.
-- [ ] I carefully followed the [README.md](https://github.com/abetlen/llama-cpp-python/blob/main/README.md).
+- [ ] I carefully followed the [README.md](https://github.com/sirajperson/falcon-cpp-python/blob/main/README.md).
 - [ ] I [searched using keywords relevant to my issue](https://docs.github.com/en/issues/tracking-your-work-with-issues/filtering-and-searching-issues-and-pull-requests) to make sure that I am creating a new issue that is not already open (or closed).
-- [ ] I reviewed the [Discussions](https://github.com/abetlen/llama-cpp-python/discussions), and have a new bug or useful enhancement to share.
+- [ ] I reviewed the [Discussions](https://github.com/sirajperson/falcon-cpp-python/discussions), and have a new bug or useful enhancement to share.
 
 # Expected Behavior
 
-Please provide a detailed written description of what you were trying to do, and what you expected `llama-cpp-python` to do.
+Please provide a detailed written description of what you were trying to do, and what you expected `falcon-cpp-python` to do.
 
 # Current Behavior
 
-Please provide a detailed written description of what `llama-cpp-python` did, instead.
+Please provide a detailed written description of what `falcon-cpp-python` did, instead.
 
 # Environment and Context
 
@@ -61,13 +61,13 @@ Please provide detailed steps for reproducing the issue. We are not sitting in f
 
 Try the following:
 
-1. `git clone https://github.com/abetlen/llama-cpp-python`
-2. `cd llama-cpp-python`
+1. `git clone https://github.com/sirajperson/falcon-cpp-python`
+2. `cd falcon-cpp-python`
 3. `rm -rf _skbuild/` # delete any old builds
 4. `python setup.py develop`
-5. `cd ./vendor/llama.cpp`
-6. Follow [llama.cpp's instructions](https://github.com/ggerganov/llama.cpp#build) to `cmake` llama.cpp
-7. Run llama.cpp's `./main` with the same arguments you previously passed to llama-cpp-python and see if you can reproduce the issue. If you can, [log an issue with llama.cpp](https://github.com/ggerganov/llama.cpp/issues)
+5. `cd ./vendor/ggllm.cpp`
+6. Follow [ggllm.cpp's instructions](https://github.com/cmp-nct/ggllm.cpp) section on how to compile with `cmake`
+7. Run ggllm.cpp's `./falcon_main` with the same arguments you previously passed to falcon-cpp-python and see if you can reproduce the issue. If you can, [log an issue with ggllm.cpp](https://github.com/cmp-nct/ggllm.cpp/issues)
 
 # Failure Logs
 
@@ -77,10 +77,10 @@ Also, please try to **avoid using screenshots** if at all possible. Instead, cop
 
 Example environment info:
 ```
-llama-cpp-python$ git log | head -1
+falcon-cpp-python$ git log | head -1
 commit 47b0aa6e957b93dbe2c29d53af16fbae2dd628f2
 
-llama-cpp-python$ python3 --version
+falcon-cpp-python$ python3 --version
 Python 3.10.10
 
 llama-cpp-python$ pip list | egrep "uvicorn|fastapi|sse-starlette|numpy"
@@ -89,8 +89,8 @@ numpy                    1.24.3
 sse-starlette            1.3.3
 uvicorn                  0.21.1
 
-llama-cpp-python/vendor/llama.cpp$ git log | head -3
+falcon-cpp-python/vendor/llama.cpp$ git log | head -3
 commit 66874d4fbcc7866377246efbcee938e8cc9c7d76
-Author: Kerfuffle <44031344+KerfuffleV2@users.noreply.github.com>
+Author: YupHippie <44031344+YupHippie@users.noreply.github.com>
 Date:   Thu May 25 20:18:01 2023 -0600
 ```
